@@ -1,0 +1,484 @@
+<!DOCTYPE HTML>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>YouTubeテスト</title>
+</head>
+<body>
+
+<span>現在時刻:<span id="NowTime"></span><br>
+<span>オペ:<span id="Operation"></span><br>
+<span>gZCount:<span id="gZCount"></span><br>
+<div id="sample"></div>
+<video autoplay width="50" height="50" style="border: solid 1px;"></video><br>
+
+<br>
+<div id="playUrl">
+再生動画ID<br>
+<input type="text" id="saiseiID"><br>
+進める秒数<br>
+<input type="text" id="skipSecond"><br>
+
+<button id="play">再生動画のセット</button><br>
+<button id="next">1秒進める</button><br>
+<button id="prev">1秒戻す</button><br>
+<button onclick="startVideo()">ビデオ開始！</button><br>
+<button onclick="stopVideo()">ビデオ終了！</button><br>
+<button onclick="walkWithYoutube()">歩きながらyoutube再生開始</button><br>
+<br>
+<hr>
+
+<hr>
+
+<img id="img1"/><br>
+<img id="img2"/><br>
+
+
+<canvas id = "canvas1" style="border: solid 1px;" width="320" height="240"></canvas>
+<canvas id = "canvas2" style="border: solid 1px;" width="320" height="240"></canvas>
+<canvas id = "canvas3" style="border: solid 1px;" width="320" height="240"></canvas>
+
+<script src="jquery-3.3.1.min.js"></script>
+<script>
+const ZENSIN = 1;
+const NO_OPE = 4;
+
+var firstFlg = true;
+
+var g_Count = 0;
+var g_ZensinCount = 0;
+
+var g_videoElement = document.querySelector('video');
+var g_canvasElement1 = document.getElementById("canvas1");
+var g_canvasElement2 = document.getElementById("canvas2");
+var g_canvasElement3 = document.getElementById("canvas3");
+
+var g_Width = g_videoElement.width;
+var g_Height = g_videoElement.height;
+
+var skipSecond = 1.0;
+document.getElementById('skipSecond').value = 1.0;
+
+// IFrame Player API の読み込み
+var tag = document.createElement('script');
+tag.src = "https://www.youtube.com/iframe_api";
+var firstScriptTag = document.getElementsByTagName('script')[0];
+firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+var ytPlayer;
+var loopFlg = false;
+
+// YouTubeの埋め込み
+function onYouTubeIframeAPIReady() {
+	ytPlayer = new YT.Player(
+		'sample', // 埋め込む場所の指定
+		{
+			width: 600, // プレーヤーの幅
+			height: 550, // プレーヤーの高さ
+			//videoId: 'bHQqvYy5KYo', // YouTubeのID
+			
+		    playerVars: {
+		      'playlist': 'rxv76yHwrAw,CqIUyFBhRAM'
+		    },
+    
+			// イベントの設定
+			events: {
+				'onReady': onPlayerReady, // プレーヤーの準備ができたときに実行
+				'onStateChange': onPlayerStateChange // プレーヤーの状態が変更されたときに実行
+			}
+			
+		}
+	);
+}
+
+var playUrls = "";
+var lines = "";
+var playListString = "";
+
+var playerReady = false;
+
+// プレーヤーの準備ができたとき
+function onPlayerReady(event) {
+	playerReady = true;
+	
+	// 動画再生
+	//event.target.playVideo();
+}
+
+// プレーヤーの状態が変更されたとき
+function onPlayerStateChange(event) {
+	// 現在のプレーヤーの状態を取得
+	var ytStatus = event.data;
+	/*
+	// 再生終了したとき
+	if (ytStatus == YT.PlayerState.ENDED) {
+		console.log('再生終了');
+		// 動画再生
+		event.target.playVideo();
+	}
+	// 再生中のとき
+	if (ytStatus == YT.PlayerState.PLAYING) {
+		console.log('再生中');
+	}
+	// 停止中のとき
+	if (ytStatus == YT.PlayerState.PAUSED) {
+		console.log('停止中');
+	}
+	// バッファリング中のとき
+	if (ytStatus == YT.PlayerState.BUFFERING) {
+		console.log('バッファリング中');
+	}
+	// 頭出し済みのとき
+	if (ytStatus == YT.PlayerState.CUED) {
+		console.log('頭出し済み');
+	}
+	*/
+}
+
+function getVideoIdListFromTextBox(){
+
+		playListString = "";
+		
+		var startIdx;
+		var endIdx;
+		var videoId1;
+		
+		playUrls = document.getElementById("textArea1").value;
+    	playUrls  = playUrls.replace(/\r\n|\r/g, "\n");    
+		lines = playUrls.split('\n');
+		
+	    for ( var i = 0; i < lines.length; i++ ) {
+	        // 空行は無視する
+	        if ( lines[i] == '' ) {
+	            continue;
+	        }
+	        
+	        if(lines[i].indexOf('https://youtu.be/') == -1){
+	        	
+		 		startIndex = lines[i].indexOf("v=");
+		 		endIndex = startIndex+11;
+		 		videoId1 = lines[i].substr(startIndex+2,11); 
+		 		
+		        if(playListString != ''){
+		         	playListString += ',';
+		        }
+		        playListString += videoId1;
+		        
+		    }else{
+		    	
+		 		startIndex = lines[i].length-11;
+		 		endIndex = lines[i].length;
+		 		
+		 		videoId1 = lines[i].substr(startIndex,11); 
+		 		
+		        if(playListString != ''){
+		         	playListString += ',';
+		        }
+		        playListString += videoId1;		    
+		    
+		    }
+	    }
+}
+
+
+
+$(function() {
+
+
+	// 再生
+	$('#play').click(function() {
+	
+		var playID = document.getElementById("saiseiID").value;
+		
+        ytPlayer.cuePlaylist({
+            'listType': 'playlist',
+            'playlist': playID,
+            'index': 0,
+            'startSeconds': 0,
+            'suggestedQuality': 'small'
+        });
+	
+		if(playerReady){
+			
+			ytPlayer.playVideo();
+			//ytPlayer.pauseVideo();
+			
+			loopFlg = false;
+		}
+	});
+
+	// 1秒前へ
+	$('#prev').click(function() {
+		if(playerReady){
+			// 現在の再生時間取得
+			var currentTime = ytPlayer.getCurrentTime();
+			// シークバーの移動
+			ytPlayer.seekTo(currentTime - 1);
+			
+		}
+	});
+	// 1秒先へ
+	$('#next').click(function() {
+		if(playerReady){
+			// 現在の再生時間取得
+			var currentTime = ytPlayer.getCurrentTime();
+			// シークバーの移動
+			ytPlayer.seekTo(currentTime + 0.5);
+			
+		}
+	});
+
+
+});
+
+
+function startVideo() {
+    console.info('入出力デバイスを確認してビデオを開始するよ！');
+
+    Promise.resolve()
+        .then(function () {
+            return navigator.mediaDevices.enumerateDevices();
+        })
+        .then(function (mediaDeviceInfoList) {
+            console.log('使える入出力デバイスs->', mediaDeviceInfoList);
+
+            var videoDevices = mediaDeviceInfoList.filter(function (deviceInfo) {
+                return deviceInfo.kind == 'videoinput';
+            });
+            if (videoDevices.length < 1) {
+                throw new Error('ビデオの入力デバイスがない、、、、、。');
+            }
+
+            return navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: {
+                    deviceId: videoDevices[0].deviceId
+                }
+            });
+        })
+        .then(function (mediaStream) {
+            console.log('取得したMediaStream->', mediaStream);
+            videoStreamInUse = mediaStream;
+            //document.querySelector('video').src = window.URL.createObjectURL(mediaStream);
+            // 対応していればこっちの方が良い
+             document.querySelector('video').srcObject = mediaStream;
+
+
+        })
+        .catch(function (error) {
+            console.error('ビデオの設定に失敗、、、、', error);
+        });
+}
+
+
+//ビデオ停止！ボタンで走るやつ
+
+function stopVideo() {
+    console.info('ビデオを止めるよ！');
+
+    videoStreamInUse.getVideoTracks()[0].stop();
+
+    if (videoStreamInUse.active) {
+        console.error('停止できません、、、', videoStreamInUse);
+    } else {
+        console.log('停止できたよ！', videoStreamInUse);
+    }
+}
+
+function UnderDiff1(ImageData1, ImageData2){
+	var context3 = g_canvasElement3.getContext('2d');
+	var out_img = context3.getImageData(0,0, g_videoElement.width, g_videoElement.height);
+    
+    var pixels1 = ImageData1.data;
+    var pixels2 = ImageData2.data;
+    var outPixels = out_img.data;
+    
+    
+    var firstY = g_Height * 0.5;
+	
+	var menseki = (g_Height - firstY) * g_Width;
+	var Changed_Count = 0;
+	
+	// ピクセル単位で操作できる
+	var base = 0;
+	
+	for(var y = 0; y < g_Height; ++y){
+		for(var x =0; x<g_Width; ++x){
+			base = (y * g_Width + x) * 4;
+		    outPixels[base + 0] = 0;  // Red
+		    outPixels[base + 1] = 0;  // Green
+		    outPixels[base + 2] = 0;  // Blue
+		    outPixels[base + 3] = 255;  // Alpha
+		}
+	}
+	
+	for (var y = firstY; y < g_Height; ++y) {
+	  for (var x = 0; x < g_Width; ++x) {
+	    base = (y * g_Width + x) * 4;
+	    // なんかピクセルに書き込む
+	    outPixels[base + 0] = Math.abs(pixels1[base + 0] - pixels2[base + 0]);  // Red
+	    outPixels[base + 1] = Math.abs(pixels1[base + 1] - pixels2[base + 1]);  // Green
+	    outPixels[base + 2] = Math.abs(pixels1[base + 2] - pixels2[base + 2]);  // Blue
+	    outPixels[base + 3] = 255;  // Alpha
+	    
+	    if(outPixels[base + 0] >= 10 &&
+	       outPixels[base + 1] >= 10 &&
+	       outPixels[base + 2] >= 10 ){
+	         Changed_Count++;
+	    }else{
+		    outPixels[base + 0] = 0;  // Red
+		    outPixels[base + 1] = 0;  // Green
+		    outPixels[base + 2] = 0;  // Blue
+		    outPixels[base + 3] = 255;  // Alpha
+	    }
+	    
+	  }
+	}
+	
+	var retVal = new Object();
+	retVal.changeRate = (Changed_Count / menseki) * 100.0;
+	retVal.outImageData = out_img;
+	
+	return retVal;
+
+}
+
+const ZENSIN_KIJUN = 10;
+const ZENSIN_KIJUN_MAX = 90;
+function JudgeZensin(UnderChangeRate){
+
+	if(UnderChangeRate >= ZENSIN_KIJUN && UnderChangeRate <= ZENSIN_KIJUN_MAX){
+		return ZENSIN;
+	}else{
+		return NO_OPE;
+	}
+}
+
+
+function walkWithYoutube(){
+    //var videoElement = document.querySelector('video');
+    //var canvasElement = document.getElementById("canvas2");
+    var context1 = g_canvasElement1.getContext('2d');
+    var context2 = g_canvasElement2.getContext('2d');
+	var context3 = g_canvasElement3.getContext('2d');
+
+
+	var img1 = context1.getImageData(0,0, g_videoElement.width, g_videoElement.height);
+	var img2 = context2.getImageData(0,0, g_videoElement.width, g_videoElement.height);
+    
+    if(firstFlg == false){
+    	//context2.drawImage(g_videoElement, 0, 0, g_videoElement.width, g_videoElement.height);
+    	
+    	outObj1 = UnderDiff1(img1, img2);
+		// 変更した内容をキャンバスに書き戻す
+		context3.putImageData(outObj1.outImageData, 0, 0);
+		
+		var ope = JudgeZensin(outObj1.changeRate);
+		var ope_span = document.getElementById("Operation");
+		if(ope == ZENSIN){
+			ope_span.style.color = "blue";
+			ope_span.innerHTML = "前進";
+			
+			g_ZensinCount++;
+			
+		}else if(ope == NO_OPE){
+			ope_span.style.color = "red";
+			ope_span.innerHTML = "操作なし";
+		}
+		
+		var span1 = document.getElementById("gZCount");
+		span1.innerHTML = g_ZensinCount;
+		
+				
+		g_Count++;
+		if(g_Count >= 200){
+	    	context1.drawImage(g_videoElement, 0, 0, g_videoElement.width, g_videoElement.height);
+	    	context2.drawImage(g_videoElement, 0, 0, g_videoElement.width, g_videoElement.height);
+			g_Count = 0;
+		}
+		
+		if((g_Count % 10) == 0){//1.0秒ごとに画面更新
+		
+		var date1 = new Date();
+	    var date2 = (date1.getFullYear() + "年" + 
+				(date1.getMonth() + 1)  + "月" + 
+				date1.getDate() + "日" + 
+				date1.getHours() + "時" + 
+				date1.getMinutes() + "分" + 
+				date1.getSeconds() + "秒")
+				
+		var nowTimeSpan = document.getElementById("NowTime")
+		nowTimeSpan.innerHTML = date2;
+		
+			if( (g_Count % 20) == 0){
+				context2.drawImage(g_videoElement, 0, 0, g_videoElement.width, g_videoElement.height);
+			}else{
+				context1.drawImage(g_videoElement, 0, 0, g_videoElement.width, g_videoElement.height);
+			}
+			
+			if(g_ZensinCount >= 20){
+			    g_ZensinCount = 0;
+			    
+				ope_span.innerHTML = "前進";
+				
+				//プレーヤーを1秒進める
+				if(playerReady){
+					// 現在の再生時間取得
+					var currentTime = ytPlayer.getCurrentTime();
+					// シークバーの移動
+					
+					skipSecond = parseFloat(document.getElementById('skipSecond').value)
+					ytPlayer.seekTo(currentTime + skipSecond);
+					
+				}
+			
+			}
+		}
+		
+		
+		
+    	//context1.drawImage(g_videoElement, 0, 0, g_videoElement.width, g_videoElement.height);
+    	//0.1秒ごとに呼び出し
+    	sleepAndExecuteFunc2(1, walkWithYoutube);
+    	
+
+    }else{
+    	firstFlg = false;
+    	
+    	context1.drawImage(g_videoElement, 0, 0, g_videoElement.width, g_videoElement.height);
+    	context2.drawImage(g_videoElement, 0, 0, g_videoElement.width, g_videoElement.height);
+
+    }
+    
+    
+}
+
+
+
+function sleepAndExecuteFunc2(waitSec, callbackFunc) {
+ 
+  var spanedSec = 0;
+ 
+  var waitFunc = function () {
+ 
+      spanedSec++;
+ 
+      if (spanedSec >= waitSec) {
+          if (callbackFunc) callbackFunc();
+          return;
+      }
+ 
+      clearTimeout(id);
+      id = setTimeout(waitFunc, 100);
+  
+  };
+ 
+  var id = setTimeout(waitFunc, 100);
+ 
+}
+ 
+</script>
+
+
+</body>
+</html>
